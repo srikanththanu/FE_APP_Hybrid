@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FE Visit App</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--tx:#1b1f27;--mu:#667085;--bd:#d9dde5;--ac:#1f3864;--acx:#fff;--ok:#1a7f4b;--bad:#c0392b;--neu:#a8690a;--okb:#e6f4ec;--badb:#fdeceb;--neub:#fdf3df}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--card:#1c212b;--tx:#e8eaef;--mu:#9aa3b2;--bd:#323a48;--ac:#8fb0ee;--acx:#10151f;--ok:#58c98a;--bad:#f1867a;--neu:#e8b44f;--okb:#17352a;--badb:#3a1f1d;--neub:#38301a}}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--tx);font:15px/1.4 Arial,Helvetica,sans-serif;max-width:760px;margin:0 auto;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+[data-mode=fe] .supOnly,[data-mode=sup] .feOnly{display:none!important}
+h1{font-size:18px;margin:0 0 8px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.jb{justify-content:space-between}
+select,input,textarea,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px}
+textarea{width:100%;min-height:70px}button{cursor:pointer}button.pri{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:bold}
+.bar{height:8px;background:var(--bd);border-radius:4px;margin:10px 0;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}.card.done{border-left:5px solid var(--ok)}.card h3{margin:0;font-size:16px}.mu{color:var(--mu);font-size:13px}
+.badge{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--bd);color:var(--mu)}
+.addr{font-size:13px;border:1px solid var(--bd);border-radius:8px;padding:6px 8px;margin-top:6px}.addr.cur{border-color:var(--ac);background:var(--neub)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.chip{padding:6px 10px;border-radius:16px;font-size:13px}.chip.p{background:var(--okb);color:var(--ok)}.chip.n{background:var(--badb);color:var(--bad)}.chip.u{background:var(--neub);color:var(--neu)}.chip.sel{outline:2px solid var(--ac);font-weight:bold}
+a{color:var(--ac)}a.btn{padding:6px 10px;border:1px solid var(--ac);border-radius:8px;text-decoration:none;font-weight:bold}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px solid var(--bd);padding:4px;text-align:left;vertical-align:top}.sc{overflow-x:auto}
+img.th{max-width:100%;max-height:120px;border-radius:6px;margin-top:6px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px}.ov[hidden]{display:none}.ov img{max-width:100%;max-height:80%}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--ac);color:var(--acx);padding:8px 14px;border-radius:20px;display:none;z-index:9}
+</style></head><body data-mode="fe">
+<h1>FE Visit App</h1>
+
+<div class="feOnly">
+ <div id="loader" class="card"><b>Load today's plan</b>
+  <p class="mu">Open the plan file your supervisor sent (.json), or paste the plan text from WhatsApp (the message starting FEPLAN:) into the box below, then tap Load.</p>
+  <input type="file" id="pf" accept=".json,.csv,.txt,.tsv"><textarea id="pt" placeholder="Paste the FEPLAN: message here (or plan rows with header row)" style="margin-top:8px"></textarea>
+  <div class="row" style="margin-top:6px"><label class="mu">Visit date <input type="date" id="pdt"></label><button class="pri" id="pl">Load pasted plan</button></div><div id="pick"></div></div>
+ <div id="app" hidden>
+  <div class="row jb"><b id="who"></b><button id="clr">Change plan</button></div>
+  <div class="bar"><i id="prog" style="width:0"></i></div><div class="mu" id="progt"></div>
+  <div id="navall"></div><div id="list"></div>
+  <button class="pri" id="send" style="width:100%;margin-top:10px">Send results to supervisor</button>
+  <p class="mu" id="smsg">Tap after your visits. It shares one file (all visits, GPS, photos) by WhatsApp / email.</p>
+ </div>
+</div>
+
+<div class="supOnly">
+ <div class="card"><b>1. Build plan files for executives</b>
+  <p class="mu">Paste the exported plan rows (All_FE_Plan or per-FE file, header row included). Send each executive their own file.</p>
+  <textarea id="ps" placeholder="Field Executive&#9;Rank&#9;Customer Name&#9;Mobile No …"></textarea>
+  <div class="row" style="margin-top:6px"><label class="mu">Visit date <input type="date" id="sdt"></label><button class="pri" id="pb">Build plan files</button><button id="pz">Download all (zip)</button></div><div id="pls"></div><textarea id="cp" hidden readonly style="min-height:60px;margin-top:8px"></textarea></div>
+ <div class="card"><b>2. Consolidate executives' result files</b>
+  <p class="mu">Select all the Visits_*.json files received (several at once is fine). Re-loading an updated file replaces the older version.</p>
+  <input type="file" id="rf" multiple accept=".json"><div id="rmsg" class="mu"></div>
+  <div class="sc"><table id="sum"></table></div>
+  <div class="row" style="margin:8px 0"><button class="pri" id="csv">Download CSV (all details)</button><button id="mk">Visit_Log rows</button><button id="zip">Download photos (zip)</button></div>
+  <textarea id="out" readonly style="min-height:60px" placeholder="Visit_Log rows (tab-separated) appear here - paste under the last row of Visit_Log"></textarea>
+  <div class="sc"><table id="tbl"></table></div></div>
+</div>
+<div class="ov" id="ov" hidden><img id="oi" alt="visit photo"><button id="oc">Close</button></div>
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+const MODE='fe';
+const DISPO=[['PTP','p'],['PAID','p'],['ANF','n'],['SKIP','n'],['DOOR LOCK','n'],['SHIFTED','n'],['CALLBACK','u'],['RTP','u'],['LEFT MESSAGE','u']];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const did=(d,m,a)=>d+'_'+m+'_'+String(a).toLowerCase();
+const GM='https://www.google.com/maps/dir/?api=1&travelmode=two-wheeler';
+const tgt=s=>(s.at==='Office'?s.oa:s.ra)||'';const full=s=>(tgt(s)?tgt(s)+', ':'')+s.pin+', India';
+const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2800)}
+function dl(name,data,type){const b=data instanceof Blob?data:new Blob([data],{type:type||'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
+function parse(txt){
+  const L=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim()),tab=L.some(l=>l.includes('\t'));
+  const sp=l=>{if(tab)return l.split('\t').map(x=>x.trim());const o=[];let c='',qq=false;for(const ch of l){if(ch==='"')qq=!qq;else if(ch===','&&!qq){o.push(c.trim());c=''}else c+=ch}o.push(c.trim());return o};
+  const hi=L.findIndex(l=>/field executive/i.test(l)&&/mobile/i.test(l));if(hi<0)return null;
+  const h=sp(L[hi]).map(x=>x.toLowerCase()),ix=k=>h.findIndex(x=>x.includes(k));
+  const c={fe:ix('field executive'),rk:ix('rank'),nm:ix('customer'),mb:ix('mobile'),ac:ix('account'),lt:ix('lot'),at:ix('visit at'),pin:ix('pin'),rv:ix('prior resi'),ov:ix('prior office'),ld:ix('last disp'),ra:ix('residence address'),oa:ix('office address')};
+  const g=(r,k)=>c[k]>=0&&r[c[k]]!=null?String(r[c[k]]).trim():'',by={};
+  L.slice(hi+1).forEach(l=>{const r=sp(l),fe=g(r,'fe'),mb=g(r,'mb');if(!fe||!mb||!g(r,'nm'))return;
+    const o=parseInt(g(r,'rk').replace(/\D/g,''))||(by[fe]?by[fe].length+1:1);
+    (by[fe]=by[fe]||[]).push({order:o,name:g(r,'nm'),mobile:mb,acct:g(r,'ac'),lot:g(r,'lt'),at:/off/i.test(g(r,'at'))?'Office':'Residence',pin:g(r,'pin'),ra:g(r,'ra'),oa:g(r,'oa'),rv:g(r,'rv'),ov:g(r,'ov'),last:g(r,'ld')==='(not visited)'?'':g(r,'ld')})});
+  return by;
+}
+const photoView=u=>{$('oi').src=u;$('ov').hidden=false};$('oc').onclick=()=>$('ov').hidden=true;
+const fname=r=>slug(r.fe)+'_'+r.mobile+'_'+r.date+'_'+r.visitAt.toLowerCase()+'.jpg';
+const gl=r=>r.gpsOk?'https://www.google.com/maps?q='+r.lat+','+r.lng:'';
+
+/* ================= FIELD EXECUTIVE ================= */
+let A={},drafts={},editing={},pending=false;
+function getGPS(){return new Promise(r=>{try{if(window.isSecureContext===false)return r({err:-2});if(!navigator.geolocation)return r({err:-1});navigator.geolocation.getCurrentPosition(g=>r({lat:+g.coords.latitude.toFixed(6),lng:+g.coords.longitude.toFixed(6),acc:Math.round(g.coords.accuracy)}),e=>r({err:(e&&e.code)||9}),{enableHighAccuracy:true,timeout:15000,maximumAge:0})}catch(x){r({err:9})}})}
+const gok=g=>!!g&&!g.err;
+const why=g=>({1:'permission denied - allow Location for this site in the browser/phone settings',2:'position unavailable - switch on phone GPS / location',3:'timed out - retry in an open area',[-1]:'location is not supported by this browser',[-2]:'open the app from an https web link in Chrome/Safari (not from a file or inside WhatsApp)'}[g&&g.err]||'unknown location error');
+function shrink(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=()=>rej();fr.onload=()=>{const im=new Image();im.onerror=()=>rej();im.onload=()=>{
+  for(const[mx,qq]of[[800,.6],[640,.5],[480,.4]]){const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);const u=c.toDataURL('image/jpeg',qq);if(u.length<170000||mx===480)return res(u)}};im.src=fr.result};fr.readAsDataURL(file)})}
+function store(){try{localStorage.setItem('fe_v2',JSON.stringify(A))}catch(e){toast('Phone storage full - send your results now')}}
+function feRender(force){
+  const a=document.activeElement;if(!force&&a&&$('list').contains(a)&&/TEXTAREA|INPUT/.test(a.tagName)){pending=true;return}pending=false;
+  $('loader').hidden=!!A.plan;$('app').hidden=!A.plan;if(!A.plan)return;
+  const p=A.plan,D=A.dispo||(A.dispo={});$('who').textContent=p.fe+' · '+p.date;
+  const st=p.stops.slice().sort((x,y)=>x.order-y.order);let done=0;
+  const pend=st.filter(s=>!D[did(p.date,s.mobile,s.at)]).slice(0,10);
+  $('navall').innerHTML=pend.length?`<a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(pend[pend.length-1]))}${pend.length>1?'&waypoints='+pend.slice(0,-1).map(s=>encodeURIComponent(full(s))).join('%7C'):''}">🧭 Navigate all ${pend.length} pending stops (from my location)</a>`:'';
+  $('list').innerHTML=st.map(s=>{
+    const r=D[did(p.date,s.mobile,s.at)],isd=!!r&&!editing[s.mobile];if(r)done++;const m=esc(s.mobile);
+    const dr=drafts[s.mobile]||(r?{d:r.disposition,fb:r.feedback,pd:r.ptpDate,amt:r.amount}:{}),cls=(DISPO.find(x=>x[0]===(r&&r.disposition))||[0,'u'])[1];
+    let h=`<div class="card ${r?'done':''}"><div class="row jb"><h3>Top ${s.order}: ${esc(s.name)}</h3><span class="badge">Visit ${esc(s.at)}</span></div>
+    <div class="mu">${esc(s.acct)} · Lot ${esc(s.lot)} · Prior visits: Resi ${esc(s.rv||0)}, Office ${esc(s.ov||0)}${s.last?' · Last: '+esc(s.last):''}</div>
+    <div class="addr ${s.at==='Residence'?'cur':''}"><b>🏠 Residence</b> ${s.at==='Residence'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.ra||'—')}</div>
+    <div class="addr ${s.at==='Office'?'cur':''}"><b>🏢 Office</b> ${s.at==='Office'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.oa||'—')}</div>
+    <div class="row" style="margin-top:8px"><a class="btn" href="tel:${m}">📞 ${m}</a><a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(s))}">🧭 Navigate</a></div>`;
+    if(isd)h+=`<div class="chips"><span class="chip ${cls} sel">${esc(r.disposition)}</span></div><div class="mu">${esc(r.ptpDate?'Date '+r.ptpDate+' ':'')}${esc(r.amount?'₹'+r.amount+' ':'')}${esc(r.feedback)}<br>${r.gpsOk?'📍 location ±'+esc(r.acc)+' m':'⚠ no GPS'} ${r.hasPhoto?'· 📷 photo':''}</div><button data-edit="${m}">Edit</button>`;
+    else{h+=`<div class="chips">${DISPO.map(([d,c])=>`<button class="chip ${c} ${dr.d===d?'sel':''}" data-d="${m}|${d}">${d}</button>`).join('')}</div>`;
+      if(dr.d==='PTP'||dr.d==='PAID')h+=`<div class="row"><input type="date" data-f="pd|${m}" value="${esc(dr.pd||'')}"><input type="number" inputmode="numeric" data-f="amt|${m}" placeholder="Amount ₹" value="${esc(dr.amt||'')}"></div>`;
+      h+=`<textarea data-f="fb|${m}" placeholder="Remarks / feedback">${esc(dr.fb||'')}</textarea>
+      <div class="row" style="margin-top:6px"><button data-gps="${m}">📍 ${dr.gps?'Location ±'+dr.gps.acc+' m ✓':'Capture location'}</button><label class="row mu">📷 <input type="file" accept="image/*" capture="environment" data-ph="${m}"></label></div>
+      ${dr.photo?`<img class="th" src="${dr.photo}" alt="photo preview">`:''}<button class="pri" data-save="${m}" style="margin-top:8px;width:100%">Save visit</button>`}
+    return h+'</div>'}).join('');
+  $('prog').style.width=(st.length?done/st.length*100:0)+'%';$('progt').textContent=done+' of '+st.length+' visits recorded';
+}
+async function feSave(m){
+  const p=A.plan,s=p.stops.find(x=>x.mobile===m),dr=drafts[m]||{};
+  if(!dr.d){toast('Select a disposition first');return}
+  if(!gok(dr.gps)){toast('Getting location…');dr.gps=await getGPS()}
+  const id=did(p.date,m,s.at),prev=A.dispo[id];let g=gok(dr.gps)?dr.gps:null;
+  if(!g&&!confirm('LOCATION NOT CAPTURED: '+why(dr.gps)+'.\n\nSave this visit WITHOUT location?')){dr.gps=null;feRender(true);return}
+  if(!dr.photo&&!(prev&&prev.hasPhoto)&&!confirm('No photo attached. Save this visit WITHOUT a photo?'))return;
+  A.dispo[id]={date:p.date,mobile:m,fe:p.fe,name:s.name,visitAt:s.at,address:tgt(s),pin:s.pin,disposition:dr.d,feedback:dr.fb||'',ptpDate:dr.pd||'',amount:dr.amt||'',order:s.order,ts:Date.now(),lat:g?g.lat:null,lng:g?g.lng:null,acc:g?g.acc:null,gpsOk:!!g,hasPhoto:!!dr.photo||!!(prev&&prev.hasPhoto)};
+  if(dr.photo){(A.photos=A.photos||{})[id]=dr.photo}
+  store();delete drafts[m];delete editing[m];toast(g?'Saved with location':'Saved (no GPS - allow location access)');feRender(true);
+}
+function setPlan(plan){A={plan,dispo:{},photos:{}};store();feRender(true)}
+function chooseFE(by,date){const names=Object.keys(by);if(!names.length){toast('No stops found - check the header row');return}
+  if(names.length===1)return setPlan({fe:names[0],date,stops:by[names[0]]});
+  $('pick').innerHTML='<p class="mu">Select your name:</p><div class="row">'+names.map(n=>`<button data-pick="${esc(n)}">${esc(n)}</button>`).join('')+'</div>';
+  $('pick').onclick=e=>{const n=e.target.dataset&&e.target.dataset.pick;if(n)setPlan({fe:n,date,stops:by[n]})}}
+function loadText(t){t=t.trim();
+  const mm=t.match(/FEPLAN:([A-Za-z0-9+\/=\s]+?):END/);
+  if(mm){try{const o=JSON.parse(decodeURIComponent(escape(atob(mm[1].replace(/\s+/g,'')))));if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops})}catch(e){}toast('Plan text incomplete - copy the WHOLE message, from FEPLAN: to :END');return}
+  if(/FEPLAN:/.test(t)){toast('Plan text incomplete - copy the WHOLE message, from FEPLAN: to :END');return}
+  if(t[0]==='{'){try{const o=JSON.parse(t);if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops})}catch(e){}toast('Not a valid plan file');return}
+  const by=parse(t);if(!by){toast('Header row (Field Executive … Mobile No) not found');return}chooseFE(by,$('pdt').value||today())}
+if(MODE==='fe'){
+  try{A=JSON.parse(localStorage.getItem('fe_v2'))||{}}catch(e){A={}}
+  $('pdt').value=today();
+  $('pf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadText(String(r.result));r.readAsText(f)};
+  $('pl').onclick=()=>loadText($('pt').value);
+  $('clr').onclick=()=>{if(confirm('Remove this plan and its saved visits from this phone? Send your results first.')){A={};try{localStorage.removeItem('fe_v2')}catch(e){}feRender(true)}};
+  document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+    if(d.d){const[m,v]=d.d.split('|');drafts[m]=Object.assign(drafts[m]||{},{d:v});feRender(true)}
+    else if(d.edit){editing[d.edit]=1;feRender(true)}
+    else if(d.save)feSave(d.save);
+    else if(d.gps){t.textContent='Locating…';const g=await getGPS();drafts[d.gps]=Object.assign(drafts[d.gps]||{},{gps:gok(g)?g:null});if(!gok(g))alert('Location not captured: '+why(g));feRender(true)}});
+  document.addEventListener('input',e=>{const f=e.target.dataset&&e.target.dataset.f;if(!f)return;const[k,m]=f.split('|');drafts[m]=drafts[m]||{};drafts[m][k]=e.target.value});
+  document.addEventListener('change',async e=>{const m=e.target.dataset&&e.target.dataset.ph;if(!m||!e.target.files[0])return;try{drafts[m]=Object.assign(drafts[m]||{},{photo:await shrink(e.target.files[0])});feRender(true)}catch(x){toast('Could not read photo')}});
+  document.addEventListener('focusout',()=>setTimeout(()=>{if(pending)feRender()},50));
+  $('send').onclick=async()=>{const ids=Object.keys(A.dispo||{});if(!ids.length){toast('No visits recorded yet');return}
+    const pay={v:2,fe:A.plan.fe,date:A.plan.date,sent:Date.now(),records:Object.values(A.dispo),photos:A.photos||{}},name='Visits_'+slug(pay.fe)+'_'+pay.date+'.json';
+    const f=new File([JSON.stringify(pay)],name,{type:'application/json'});
+    try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});$('smsg').textContent='Shared '+ids.length+' visit(s).';return}}catch(e){if(e&&e.name==='AbortError')return}
+    dl(name,f);$('smsg').textContent='File downloaded ('+name+') - send it to your supervisor by WhatsApp / email.'};
+  feRender(true);
+}
+
+/* ================= SUPERVISOR ================= */
+let PL={},R={},P={};
+if(MODE==='sup'){
+  $('sdt').value=today();
+  const planFile=fe=>({name:'Plan_'+slug(fe)+'_'+$('sdt').value+'.json',text:JSON.stringify({fe,date:$('sdt').value,stops:PL[fe]})});
+  $('pb').onclick=()=>{const by=parse($('ps').value);if(!by||!Object.keys(by).length){toast('Header row (Field Executive … Mobile No) not found');return}PL=by;
+    $('pls').innerHTML='<div class="row" style="margin-top:8px">'+Object.keys(by).map(f=>`<span class="row" style="width:100%"><b>${esc(f)}</b> (${by[f].length}) <button data-pc="${esc(f)}">📋 Copy plan text</button><button data-pf="${esc(f)}">⬇ File</button></span>`).join('')+'</div>';supv()};
+  $('pls').onclick=async e=>{const d=e.target.dataset||{};
+    if(d.pf){const o=planFile(d.pf);dl(o.name,o.text,'application/json')}
+    else if(d.pc){const o=planFile(d.pc),txt='Plan for '+d.pc+' - '+$('sdt').value+'. Copy this whole message, open the FE Visit App and paste it under "Load today\'s plan":\nFEPLAN:'+btoa(unescape(encodeURIComponent(o.text)))+':END';
+      $('cp').value=txt;$('cp').hidden=false;$('cp').select();
+      let ok=false;try{await navigator.clipboard.writeText(txt);ok=true}catch(x){try{ok=document.execCommand('copy')}catch(y){}}
+      toast(ok?'Copied - paste it into WhatsApp':'Select the text below and copy it')}};
+  $('pz').onclick=async()=>{if(!Object.keys(PL).length){toast('Build plan files first');return}if(!window.JSZip){toast('Zip library not loaded - use the individual buttons');return}
+    const z=new JSZip();Object.keys(PL).forEach(f=>{const o=planFile(f);z.file(o.name,o.text)});dl('FE_Plans_'+$('sdt').value+'.zip',await z.generateAsync({type:'blob'}))};
+  $('rf').onchange=async e=>{let n=0,v=0;
+    for(const f of e.target.files){try{const o=JSON.parse(await f.text());(o.records||[]).forEach(r=>{const id=did(r.date,r.mobile,r.visitAt);if(!R[id]||r.ts>=R[id].ts){R[id]=r;if(o.photos&&o.photos[id])P[id]=o.photos[id];v++}});n++}catch(x){toast('Could not read '+f.name)}}
+    $('rmsg').textContent=n+' file(s) read, '+Object.keys(R).length+' visit(s) in total.';supv()};
+  const recs=()=>Object.values(R).sort((a,b)=>a.ts-b.ts);
+  function supv(){const X=recs(),fes=[...new Set(X.map(r=>r.fe).concat(Object.keys(PL)))].sort();
+    $('sum').innerHTML='<tr><th>Field Executive</th><th>Planned</th><th>Recorded</th><th>GPS ok</th><th>Photos</th></tr>'+fes.map(f=>{const x=X.filter(r=>r.fe===f);return `<tr><td>${esc(f)}</td><td>${PL[f]?PL[f].length:'-'}</td><td>${x.length}</td><td>${x.filter(r=>r.gpsOk).length}</td><td>${x.filter(r=>r.hasPhoto).length}</td></tr>`}).join('');
+    $('tbl').innerHTML='<tr><th>Time</th><th>FE</th><th>Customer</th><th>At</th><th>Disp.</th><th>Remarks</th><th>GPS</th><th>Photo</th></tr>'+X.map(r=>{const id=did(r.date,r.mobile,r.visitAt);return `<tr><td>${esc(new Date(r.ts).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td>${esc(r.fe)}</td><td>${esc(r.name)}<br>${esc(r.mobile)}</td><td>${esc(r.visitAt)}</td><td>${esc(r.disposition)}</td><td>${esc(r.feedback)}</td><td>${r.gpsOk?`<a target="_blank" rel="noopener" href="${gl(r)}">±${esc(r.acc)}m</a>`:'<span style="color:var(--bad)">no GPS</span>'}</td><td>${P[id]?`<button data-ph="${esc(id)}">View</button>`:'<span style="color:var(--bad)">'+(r.hasPhoto?'photo missing in file':'no photo')+'</span>'}</td></tr>`}).join('')}
+  $('tbl').onclick=e=>{const id=e.target.dataset&&e.target.dataset.ph;if(id&&P[id])photoView(P[id])};
+  $('csv').onclick=()=>{const X=recs();if(!X.length){toast('Load result files first');return}
+    const hd=['Visit Date','Time','Field Executive','Customer','Mobile No','Visited At','Visit Address','PIN','Disposition','PTP/Paid Date','Amount','Remarks','Latitude','Longitude','GPS Accuracy (m)','GPS Map Link','Photo File'];
+    dl('Dispositions_'+X[0].date+(X.some(r=>r.date!==X[0].date)?'_multi':'')+'.csv','\ufeff'+hd.map(q).join(',')+'\n'+X.map(r=>[r.date,new Date(r.ts).toLocaleTimeString(),r.fe,r.name,r.mobile,r.visitAt,r.address,r.pin,r.disposition,r.ptpDate,r.amount,r.feedback,r.lat,r.lng,r.acc,gl(r),P[did(r.date,r.mobile,r.visitAt)]?fname(r):''].map(q).join(',')).join('\n'),'text/csv')};
+  $('mk').onclick=()=>{const X=recs();$('out').value=X.map(r=>[r.date,r.mobile,r.visitAt,r.disposition,[r.ptpDate&&'Date '+r.ptpDate,r.amount&&'Rs '+r.amount,r.feedback,'(FE: '+r.fe+')'].filter(Boolean).join(' | ').replace(/[\t\n]/g,' ')].join('\t')).join('\n');$('out').select();toast(X.length+' row(s)')};
+  $('zip').onclick=async()=>{const X=recs().filter(r=>P[did(r.date,r.mobile,r.visitAt)]);if(!X.length){toast('No photos loaded');return}if(!window.JSZip){toast('Zip library not loaded (needs internet)');return}
+    const z=new JSZip();X.forEach(r=>z.file(fname(r),P[did(r.date,r.mobile,r.visitAt)].split(',')[1],{base64:true}));dl('Photos_'+X[0].date+'.zip',await z.generateAsync({type:'blob'}))};
+  supv();
+}
+</script></body></html>
