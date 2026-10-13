@@ -13,6 +13,7 @@ textarea{width:100%;min-height:70px}button{cursor:pointer}button.pri{background:
 .bar{height:8px;background:var(--bd);border-radius:4px;margin:10px 0;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok)}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}.card.done{border-left:5px solid var(--ok)}.card h3{margin:0;font-size:16px}.mu{color:var(--mu);font-size:13px}
 .badge{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--bd);color:var(--mu)}
+.amt{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.amt span{background:var(--okb);color:var(--tx);border-radius:8px;padding:6px 10px;font-size:14px}
 .addr{font-size:13px;border:1px solid var(--bd);border-radius:8px;padding:6px 8px;margin-top:6px}.addr.cur{border-color:var(--ac);background:var(--neub)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.chip{padding:6px 10px;border-radius:16px;font-size:13px}.chip.p{background:var(--okb);color:var(--ok)}.chip.n{background:var(--badb);color:var(--bad)}.chip.u{background:var(--neub);color:var(--neu)}.chip.sel{outline:2px solid var(--ac);font-weight:bold}
 a{color:var(--ac)}a.btn{padding:6px 10px;border:1px solid var(--ac);border-radius:8px;text-decoration:none;font-weight:bold}
@@ -39,22 +40,22 @@ img.th{max-width:100%;max-height:120px;border-radius:6px;margin-top:6px}
 
 <div class="supOnly">
  <div class="card"><b>1. Build plan files for executives</b>
-  <p class="mu">Paste the exported plan rows (All_FE_Plan or per-FE file, header row included). Send each executive their own file.</p>
+  <p class="mu">Paste the exported plan rows for your state (All_FE_Plan or per-FE file, header row included - needs the State column; include POS Allocated, MAD and Physical Target so the FE sees them). Only <b></b> executives are accepted. Send each executive their own plan.</p>
   <textarea id="ps" placeholder="Field Executive&#9;Rank&#9;Customer Name&#9;Mobile No …"></textarea>
   <div class="row" style="margin-top:6px"><label class="mu">Visit date <input type="date" id="sdt"></label><button class="pri" id="pb">Build plan files</button><button id="pz">Download all (zip)</button></div><div id="pls"></div><textarea id="cp" hidden readonly style="min-height:60px;margin-top:8px"></textarea></div>
  <div class="card"><b>2. Consolidate executives' result files</b>
-  <p class="mu">Select all the Visits_*.json files received (several at once is fine). Re-loading an updated file replaces the older version.</p>
+  <p class="mu">Select all the Visits_*.json files received from your  executives (files from other states are rejected). Re-loading an updated file replaces the older version.</p>
   <input type="file" id="rf" multiple accept=".json"><div id="rmsg" class="mu"></div>
   <div class="sc"><table id="sum"></table></div>
-  <div class="row" style="margin:8px 0"><button class="pri" id="csv">Download CSV (all details)</button><button id="mk">Visit_Log rows</button><button id="zip">Download photos (zip)</button></div>
-  <textarea id="out" readonly style="min-height:60px" placeholder="Visit_Log rows (tab-separated) appear here - paste under the last row of Visit_Log"></textarea>
+  <div class="row" style="margin:8px 0"><button class="pri" id="csv">Download CSV (all details)</button><button id="mk">Copy-ready rows (same as CSV)</button><button id="zip">Download photos (zip)</button></div>
+  <textarea id="out" readonly style="min-height:60px" placeholder="Rows with the same 17 columns as the CSV (no header) appear here - paste under the last row of the Visit_Log sheet"></textarea>
   <div class="sc"><table id="tbl"></table></div></div>
 </div>
 <div class="ov" id="ov" hidden><img id="oi" alt="visit photo"><button id="oc">Close</button></div>
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-const MODE='fe';
+const MODE='fe',STATE='';
 const DISPO=[['PTP','p'],['PAID','p'],['ANF','n'],['SKIP','n'],['DOOR LOCK','n'],['SHIFTED','n'],['CALLBACK','u'],['RTP','u'],['LEFT MESSAGE','u']];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -63,6 +64,7 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 const did=(d,m,a)=>d+'_'+m+'_'+String(a).toLowerCase();
 const GM='https://www.google.com/maps/dir/?api=1&travelmode=two-wheeler';
 const tgt=s=>(s.at==='Office'?s.oa:s.ra)||'';const full=s=>(tgt(s)?tgt(s)+', ':'')+s.pin+', India';
+const fmt=n=>(n===''||n==null||isNaN(n))?'—':'₹'+Number(n).toLocaleString('en-IN');
 const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
 function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2800)}
 function dl(name,data,type){const b=data instanceof Blob?data:new Blob([data],{type:type||'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
@@ -71,11 +73,11 @@ function parse(txt){
   const sp=l=>{if(tab)return l.split('\t').map(x=>x.trim());const o=[];let c='',qq=false;for(const ch of l){if(ch==='"')qq=!qq;else if(ch===','&&!qq){o.push(c.trim());c=''}else c+=ch}o.push(c.trim());return o};
   const hi=L.findIndex(l=>/field executive/i.test(l)&&/mobile/i.test(l));if(hi<0)return null;
   const h=sp(L[hi]).map(x=>x.toLowerCase()),ix=k=>h.findIndex(x=>x.includes(k));
-  const c={fe:ix('field executive'),rk:ix('rank'),nm:ix('customer'),mb:ix('mobile'),ac:ix('account'),lt:ix('lot'),at:ix('visit at'),pin:ix('pin'),rv:ix('prior resi'),ov:ix('prior office'),ld:ix('last disp'),ra:ix('residence address'),oa:ix('office address')};
-  const g=(r,k)=>c[k]>=0&&r[c[k]]!=null?String(r[c[k]]).trim():'',by={};
+  const c={fe:ix('field executive'),st:ix('state'),pos:ix('pos allocated'),mad:ix('mad'),pt:ix('physical target'),rk:ix('rank'),nm:ix('customer'),mb:ix('mobile'),ac:ix('account'),lt:ix('lot'),at:ix('visit at'),pin:ix('pin'),rv:ix('prior resi'),ov:ix('prior office'),ld:ix('last disp'),ra:ix('residence address'),oa:ix('office address')};
+  const g=(r,k)=>c[k]>=0&&r[c[k]]!=null?String(r[c[k]]).trim():'',by={},nm=(r,k)=>{const x=parseFloat(String(g(r,k)).replace(/[^0-9.]/g,''));return isNaN(x)?'':x};
   L.slice(hi+1).forEach(l=>{const r=sp(l),fe=g(r,'fe'),mb=g(r,'mb');if(!fe||!mb||!g(r,'nm'))return;
     const o=parseInt(g(r,'rk').replace(/\D/g,''))||(by[fe]?by[fe].length+1:1);
-    (by[fe]=by[fe]||[]).push({order:o,name:g(r,'nm'),mobile:mb,acct:g(r,'ac'),lot:g(r,'lt'),at:/off/i.test(g(r,'at'))?'Office':'Residence',pin:g(r,'pin'),ra:g(r,'ra'),oa:g(r,'oa'),rv:g(r,'rv'),ov:g(r,'ov'),last:g(r,'ld')==='(not visited)'?'':g(r,'ld')})});
+    (by[fe]=by[fe]||[]).push({order:o,name:g(r,'nm'),pos:nm(r,'pos'),mad:nm(r,'mad'),pt:nm(r,'pt'),mobile:mb,acct:g(r,'ac'),lot:g(r,'lt'),at:/off/i.test(g(r,'at'))?'Office':'Residence',pin:g(r,'pin'),ra:g(r,'ra'),oa:g(r,'oa'),rv:g(r,'rv'),ov:g(r,'ov'),last:g(r,'ld')==='(not visited)'?'':g(r,'ld')});if(!by[fe].state)by[fe].state=g(r,'st')});
   return by;
 }
 const photoView=u=>{$('oi').src=u;$('ov').hidden=false};$('oc').onclick=()=>$('ov').hidden=true;
@@ -93,7 +95,7 @@ function store(){try{localStorage.setItem('fe_v2',JSON.stringify(A))}catch(e){to
 function feRender(force){
   const a=document.activeElement;if(!force&&a&&$('list').contains(a)&&/TEXTAREA|INPUT/.test(a.tagName)){pending=true;return}pending=false;
   $('loader').hidden=!!A.plan;$('app').hidden=!A.plan;if(!A.plan)return;
-  const p=A.plan,D=A.dispo||(A.dispo={});$('who').textContent=p.fe+' · '+p.date;
+  const p=A.plan,D=A.dispo||(A.dispo={});$('who').textContent=p.fe+' · '+(p.state?p.state+' · ':'')+p.date;
   const st=p.stops.slice().sort((x,y)=>x.order-y.order);let done=0;
   const pend=st.filter(s=>!D[did(p.date,s.mobile,s.at)]).slice(0,10);
   $('navall').innerHTML=pend.length?`<a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(pend[pend.length-1]))}${pend.length>1?'&waypoints='+pend.slice(0,-1).map(s=>encodeURIComponent(full(s))).join('%7C'):''}">🧭 Navigate all ${pend.length} pending stops (from my location)</a>`:'';
@@ -102,12 +104,13 @@ function feRender(force){
     const dr=drafts[s.mobile]||(r?{d:r.disposition,fb:r.feedback,pd:r.ptpDate,amt:r.amount}:{}),cls=(DISPO.find(x=>x[0]===(r&&r.disposition))||[0,'u'])[1];
     let h=`<div class="card ${r?'done':''}"><div class="row jb"><h3>Top ${s.order}: ${esc(s.name)}</h3><span class="badge">Visit ${esc(s.at)}</span></div>
     <div class="mu">${esc(s.acct)} · Lot ${esc(s.lot)} · Prior visits: Resi ${esc(s.rv||0)}, Office ${esc(s.ov||0)}${s.last?' · Last: '+esc(s.last):''}</div>
+    ${(s.pos!==''&&s.pos!=null)||(s.mad!==''&&s.mad!=null)?`<div class="amt"><span>POS <b>${fmt(s.pos)}</b></span><span>MAD <b>${fmt(s.mad)}</b></span><span>Physical target <b>${fmt(s.pt!==''&&s.pt!=null?s.pt:(s.pos?Math.round(s.pos*0.2):''))}</b></span></div><div class="mu">Account counts as paid once the MAD is collected. Aim for the physical target.</div>`:''}
     <div class="addr ${s.at==='Residence'?'cur':''}"><b>🏠 Residence</b> ${s.at==='Residence'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.ra||'—')}</div>
     <div class="addr ${s.at==='Office'?'cur':''}"><b>🏢 Office</b> ${s.at==='Office'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.oa||'—')}</div>
     <div class="row" style="margin-top:8px"><a class="btn" href="tel:${m}">📞 ${m}</a><a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(s))}">🧭 Navigate</a></div>`;
     if(isd)h+=`<div class="chips"><span class="chip ${cls} sel">${esc(r.disposition)}</span></div><div class="mu">${esc(r.ptpDate?'Date '+r.ptpDate+' ':'')}${esc(r.amount?'₹'+r.amount+' ':'')}${esc(r.feedback)}<br>${r.gpsOk?'📍 location ±'+esc(r.acc)+' m':'⚠ no GPS'} ${r.hasPhoto?'· 📷 photo':''}</div><button data-edit="${m}">Edit</button>`;
     else{h+=`<div class="chips">${DISPO.map(([d,c])=>`<button class="chip ${c} ${dr.d===d?'sel':''}" data-d="${m}|${d}">${d}</button>`).join('')}</div>`;
-      if(dr.d==='PTP'||dr.d==='PAID')h+=`<div class="row"><input type="date" data-f="pd|${m}" value="${esc(dr.pd||'')}"><input type="number" inputmode="numeric" data-f="amt|${m}" placeholder="Amount ₹" value="${esc(dr.amt||'')}"></div>`;
+      if(dr.d==='PTP'||dr.d==='PAID')h+=`<div class="row"><input type="date" data-f="pd|${m}" value="${esc(dr.pd||'')}"><input type="number" inputmode="numeric" data-f="amt|${m}" placeholder="Amount collected ₹${s.mad?' (MAD '+fmt(s.mad)+')':''}" value="${esc(dr.amt||'')}"></div>`;
       h+=`<textarea data-f="fb|${m}" placeholder="Remarks / feedback">${esc(dr.fb||'')}</textarea>
       <div class="row" style="margin-top:6px"><button data-gps="${m}">📍 ${dr.gps?'Location ±'+dr.gps.acc+' m ✓':'Capture location'}</button><label class="row mu">📷 <input type="file" accept="image/*" capture="environment" data-ph="${m}"></label></div>
       ${dr.photo?`<img class="th" src="${dr.photo}" alt="photo preview">`:''}<button class="pri" data-save="${m}" style="margin-top:8px;width:100%">Save visit</button>`}
@@ -117,6 +120,8 @@ function feRender(force){
 async function feSave(m){
   const p=A.plan,s=p.stops.find(x=>x.mobile===m),dr=drafts[m]||{};
   if(!dr.d){toast('Select a disposition first');return}
+  if(dr.d==='PAID'&&!(parseFloat(dr.amt)>0)){alert('Enter the AMOUNT COLLECTED for a PAID visit - it is used for the FE ranking.');return}
+  if(dr.d==='PAID'&&s.mad&&parseFloat(dr.amt)<s.mad&&!confirm('Amount collected (₹'+dr.amt+') is BELOW the MAD ('+fmt(s.mad)+'). The account will stay UNPAID.\n\nSave anyway?'))return;
   if(!gok(dr.gps)){toast('Getting location…');dr.gps=await getGPS()}
   const id=did(p.date,m,s.at),prev=A.dispo[id];let g=gok(dr.gps)?dr.gps:null;
   if(!g&&!confirm('LOCATION NOT CAPTURED: '+why(dr.gps)+'.\n\nSave this visit WITHOUT location?')){dr.gps=null;feRender(true);return}
@@ -127,14 +132,14 @@ async function feSave(m){
 }
 function setPlan(plan){A={plan,dispo:{},photos:{}};store();feRender(true)}
 function chooseFE(by,date){const names=Object.keys(by);if(!names.length){toast('No stops found - check the header row');return}
-  if(names.length===1)return setPlan({fe:names[0],date,stops:by[names[0]]});
+  if(names.length===1)return setPlan({fe:names[0],date,stops:by[names[0]],state:by[names[0]].state||''});
   $('pick').innerHTML='<p class="mu">Select your name:</p><div class="row">'+names.map(n=>`<button data-pick="${esc(n)}">${esc(n)}</button>`).join('')+'</div>';
-  $('pick').onclick=e=>{const n=e.target.dataset&&e.target.dataset.pick;if(n)setPlan({fe:n,date,stops:by[n]})}}
+  $('pick').onclick=e=>{const n=e.target.dataset&&e.target.dataset.pick;if(n)setPlan({fe:n,date,stops:by[n],state:by[n].state||''})}}
 function loadText(t){t=t.trim();
   const mm=t.match(/FEPLAN:([A-Za-z0-9+\/=\s]+?):END/);
-  if(mm){try{const o=JSON.parse(decodeURIComponent(escape(atob(mm[1].replace(/\s+/g,'')))));if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops})}catch(e){}toast('Plan text incomplete - copy the WHOLE message, from FEPLAN: to :END');return}
+  if(mm){try{const o=JSON.parse(decodeURIComponent(escape(atob(mm[1].replace(/\s+/g,'')))));if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops,state:o.state||''})}catch(e){}toast('Plan text incomplete - copy the WHOLE message, from FEPLAN: to :END');return}
   if(/FEPLAN:/.test(t)){toast('Plan text incomplete - copy the WHOLE message, from FEPLAN: to :END');return}
-  if(t[0]==='{'){try{const o=JSON.parse(t);if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops})}catch(e){}toast('Not a valid plan file');return}
+  if(t[0]==='{'){try{const o=JSON.parse(t);if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops,state:o.state||''})}catch(e){}toast('Not a valid plan file');return}
   const by=parse(t);if(!by){toast('Header row (Field Executive … Mobile No) not found');return}chooseFE(by,$('pdt').value||today())}
 if(MODE==='fe'){
   try{A=JSON.parse(localStorage.getItem('fe_v2'))||{}}catch(e){A={}}
@@ -151,7 +156,7 @@ if(MODE==='fe'){
   document.addEventListener('change',async e=>{const m=e.target.dataset&&e.target.dataset.ph;if(!m||!e.target.files[0])return;try{drafts[m]=Object.assign(drafts[m]||{},{photo:await shrink(e.target.files[0])});feRender(true)}catch(x){toast('Could not read photo')}});
   document.addEventListener('focusout',()=>setTimeout(()=>{if(pending)feRender()},50));
   $('send').onclick=async()=>{const ids=Object.keys(A.dispo||{});if(!ids.length){toast('No visits recorded yet');return}
-    const pay={v:2,fe:A.plan.fe,date:A.plan.date,sent:Date.now(),records:Object.values(A.dispo),photos:A.photos||{}},name='Visits_'+slug(pay.fe)+'_'+pay.date+'.json';
+    const pay={v:2,fe:A.plan.fe,state:A.plan.state||'',date:A.plan.date,sent:Date.now(),records:Object.values(A.dispo),photos:A.photos||{}},name='Visits_'+slug(pay.fe)+'_'+pay.date+'.json';
     const f=new File([JSON.stringify(pay)],name,{type:'application/json'});
     try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});$('smsg').textContent='Shared '+ids.length+' visit(s).';return}}catch(e){if(e&&e.name==='AbortError')return}
     dl(name,f);$('smsg').textContent='File downloaded ('+name+') - send it to your supervisor by WhatsApp / email.'};
@@ -162,9 +167,10 @@ if(MODE==='fe'){
 let PL={},R={},P={};
 if(MODE==='sup'){
   $('sdt').value=today();
-  const planFile=fe=>({name:'Plan_'+slug(fe)+'_'+$('sdt').value+'.json',text:JSON.stringify({fe,date:$('sdt').value,stops:PL[fe]})});
-  $('pb').onclick=()=>{const by=parse($('ps').value);if(!by||!Object.keys(by).length){toast('Header row (Field Executive … Mobile No) not found');return}PL=by;
-    $('pls').innerHTML='<div class="row" style="margin-top:8px">'+Object.keys(by).map(f=>`<span class="row" style="width:100%"><b>${esc(f)}</b> (${by[f].length}) <button data-pc="${esc(f)}">📋 Copy plan text</button><button data-pf="${esc(f)}">⬇ File</button></span>`).join('')+'</div>';supv()};
+  const planFile=fe=>({name:'Plan_'+slug(fe)+'_'+$('sdt').value+'.json',text:JSON.stringify({fe,state:STATE,date:$('sdt').value,stops:PL[fe]})});
+  $('pb').onclick=()=>{const by=parse($('ps').value);if(!by||!Object.keys(by).length){toast('Header row (Field Executive … Mobile No) not found');return}const ign=Object.keys(by).filter(f=>(by[f].state||'')!==STATE);ign.forEach(f=>delete by[f]);
+    if(!Object.keys(by).length){toast('No '+STATE+' executives in these rows - the State column must say '+STATE);return}PL=by;const miss=Object.values(by).reduce((n,a)=>n+a.filter(x=>x.mad===''||x.pos==='').length,0);
+    $('pls').innerHTML='<div class="row" style="margin-top:8px">'+Object.keys(by).map(f=>`<span class="row" style="width:100%"><b>${esc(f)}</b> (${by[f].length}) <button data-pc="${esc(f)}">📋 Copy plan text</button><button data-pf="${esc(f)}">⬇ File</button></span>`).join('')+'</div>'+(miss?`<p class="mu" style="color:var(--bad)">${miss} stop(s) have no POS / MAD - the FE will not see amounts. Include the POS Allocated, MAD and Physical Target columns in the pasted rows.</p>`:'');supv()};
   $('pls').onclick=async e=>{const d=e.target.dataset||{};
     if(d.pf){const o=planFile(d.pf);dl(o.name,o.text,'application/json')}
     else if(d.pc){const o=planFile(d.pc),txt='Plan for '+d.pc+' - '+$('sdt').value+'. Copy this whole message, open the FE Visit App and paste it under "Load today\'s plan":\nFEPLAN:'+btoa(unescape(encodeURIComponent(o.text)))+':END';
@@ -174,17 +180,18 @@ if(MODE==='sup'){
   $('pz').onclick=async()=>{if(!Object.keys(PL).length){toast('Build plan files first');return}if(!window.JSZip){toast('Zip library not loaded - use the individual buttons');return}
     const z=new JSZip();Object.keys(PL).forEach(f=>{const o=planFile(f);z.file(o.name,o.text)});dl('FE_Plans_'+$('sdt').value+'.zip',await z.generateAsync({type:'blob'}))};
   $('rf').onchange=async e=>{let n=0,v=0;
-    for(const f of e.target.files){try{const o=JSON.parse(await f.text());(o.records||[]).forEach(r=>{const id=did(r.date,r.mobile,r.visitAt);if(!R[id]||r.ts>=R[id].ts){R[id]=r;if(o.photos&&o.photos[id])P[id]=o.photos[id];v++}});n++}catch(x){toast('Could not read '+f.name)}}
+    for(const f of e.target.files){try{const o=JSON.parse(await f.text());if((o.state||'')!==STATE){toast(f.name+': not a '+STATE+' file - ignored');continue}(o.records||[]).forEach(r=>{const id=did(r.date,r.mobile,r.visitAt);if(!R[id]||r.ts>=R[id].ts){R[id]=r;if(o.photos&&o.photos[id])P[id]=o.photos[id];v++}});n++}catch(x){toast('Could not read '+f.name)}}
     $('rmsg').textContent=n+' file(s) read, '+Object.keys(R).length+' visit(s) in total.';supv()};
   const recs=()=>Object.values(R).sort((a,b)=>a.ts-b.ts);
   function supv(){const X=recs(),fes=[...new Set(X.map(r=>r.fe).concat(Object.keys(PL)))].sort();
     $('sum').innerHTML='<tr><th>Field Executive</th><th>Planned</th><th>Recorded</th><th>GPS ok</th><th>Photos</th></tr>'+fes.map(f=>{const x=X.filter(r=>r.fe===f);return `<tr><td>${esc(f)}</td><td>${PL[f]?PL[f].length:'-'}</td><td>${x.length}</td><td>${x.filter(r=>r.gpsOk).length}</td><td>${x.filter(r=>r.hasPhoto).length}</td></tr>`}).join('');
     $('tbl').innerHTML='<tr><th>Time</th><th>FE</th><th>Customer</th><th>At</th><th>Disp.</th><th>Remarks</th><th>GPS</th><th>Photo</th></tr>'+X.map(r=>{const id=did(r.date,r.mobile,r.visitAt);return `<tr><td>${esc(new Date(r.ts).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td>${esc(r.fe)}</td><td>${esc(r.name)}<br>${esc(r.mobile)}</td><td>${esc(r.visitAt)}</td><td>${esc(r.disposition)}</td><td>${esc(r.feedback)}</td><td>${r.gpsOk?`<a target="_blank" rel="noopener" href="${gl(r)}">±${esc(r.acc)}m</a>`:'<span style="color:var(--bad)">no GPS</span>'}</td><td>${P[id]?`<button data-ph="${esc(id)}">View</button>`:'<span style="color:var(--bad)">'+(r.hasPhoto?'photo missing in file':'no photo')+'</span>'}</td></tr>`}).join('')}
   $('tbl').onclick=e=>{const id=e.target.dataset&&e.target.dataset.ph;if(id&&P[id])photoView(P[id])};
+  const rowsOf=X=>X.map(r=>[r.date,new Date(r.ts).toLocaleTimeString(),r.fe,r.name,r.mobile,r.visitAt,r.address,r.pin,r.disposition,r.ptpDate,r.amount,r.feedback,r.lat,r.lng,r.acc,gl(r),P[did(r.date,r.mobile,r.visitAt)]?fname(r):'']);
   $('csv').onclick=()=>{const X=recs();if(!X.length){toast('Load result files first');return}
     const hd=['Visit Date','Time','Field Executive','Customer','Mobile No','Visited At','Visit Address','PIN','Disposition','PTP/Paid Date','Amount','Remarks','Latitude','Longitude','GPS Accuracy (m)','GPS Map Link','Photo File'];
-    dl('Dispositions_'+X[0].date+(X.some(r=>r.date!==X[0].date)?'_multi':'')+'.csv','\ufeff'+hd.map(q).join(',')+'\n'+X.map(r=>[r.date,new Date(r.ts).toLocaleTimeString(),r.fe,r.name,r.mobile,r.visitAt,r.address,r.pin,r.disposition,r.ptpDate,r.amount,r.feedback,r.lat,r.lng,r.acc,gl(r),P[did(r.date,r.mobile,r.visitAt)]?fname(r):''].map(q).join(',')).join('\n'),'text/csv')};
-  $('mk').onclick=()=>{const X=recs();$('out').value=X.map(r=>[r.date,r.mobile,r.visitAt,r.disposition,[r.ptpDate&&'Date '+r.ptpDate,r.amount&&'Rs '+r.amount,r.feedback,'(FE: '+r.fe+')'].filter(Boolean).join(' | ').replace(/[\t\n]/g,' ')].join('\t')).join('\n');$('out').select();toast(X.length+' row(s)')};
+    dl('Dispositions_'+X[0].date+(X.some(r=>r.date!==X[0].date)?'_multi':'')+'.csv','\ufeff'+hd.map(q).join(',')+'\n'+rowsOf(X).map(a=>a.map(q).join(',')).join('\n'),'text/csv')};
+  $('mk').onclick=()=>{const X=recs();$('out').value=rowsOf(X).map(a=>a.map(v=>String(v==null?'':v).replace(/[\t\r\n]/g,' ')).join('\t')).join('\n');$('out').select();toast(X.length+' row(s)')};
   $('zip').onclick=async()=>{const X=recs().filter(r=>P[did(r.date,r.mobile,r.visitAt)]);if(!X.length){toast('No photos loaded');return}if(!window.JSZip){toast('Zip library not loaded (needs internet)');return}
     const z=new JSZip();X.forEach(r=>z.file(fname(r),P[did(r.date,r.mobile,r.visitAt)].split(',')[1],{base64:true}));dl('Photos_'+X[0].date+'.zip',await z.generateAsync({type:'blob'}))};
   supv();
