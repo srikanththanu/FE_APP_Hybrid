@@ -47,8 +47,8 @@ img.th{max-width:100%;max-height:120px;border-radius:6px;margin-top:6px}
   <p class="mu">Select all the Visits_*.json files received from your  executives (files from other states are rejected). Re-loading an updated file replaces the older version.</p>
   <input type="file" id="rf" multiple accept=".json"><div id="rmsg" class="mu"></div>
   <div class="sc"><table id="sum"></table></div>
-  <div class="row" style="margin:8px 0"><button class="pri" id="csv">Download CSV (all details)</button><button id="mk">Copy-ready rows (same as CSV)</button><button id="zip">Download photos (zip)</button></div>
-  <textarea id="out" readonly style="min-height:60px" placeholder="Rows with the same 17 columns as the CSV (no header) appear here - paste under the last row of the Visit_Log sheet"></textarea>
+  <div class="row" style="margin:8px 0"><button class="pri" id="csv">Download CSV (all details, one row per account)</button><button id="mk">Copy-ready rows (same as CSV)</button><button id="zip">Download photos (zip)</button></div>
+  <textarea id="out" readonly style="min-height:60px" placeholder="Rows with the same 18 columns as the CSV (no header) appear here - paste under the last row of the Visit_Log sheet"></textarea>
   <div class="sc"><table id="tbl"></table></div></div>
 </div>
 <div class="ov" id="ov" hidden><img id="oi" alt="visit photo"><button id="oc">Close</button></div>
@@ -61,7 +61,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-const did=(d,m,a)=>d+'_'+m+'_'+String(a).toLowerCase();
+const did=(d,m,a,c)=>d+'_'+m+'_'+String(a).toLowerCase()+'_'+String(c==null?'':c).toLowerCase();
+const pid=(d,m,a)=>d+'_'+m+'_'+String(a).toLowerCase();
 const GM='https://www.google.com/maps/dir/?api=1&travelmode=two-wheeler';
 const tgt=s=>(s.at==='Office'?s.oa:s.ra)||'';const full=s=>(tgt(s)?tgt(s)+', ':'')+s.pin+', India';
 const fmt=n=>(n===''||n==null||isNaN(n))?'—':'₹'+Number(n).toLocaleString('en-IN');
@@ -92,43 +93,61 @@ const why=g=>({1:'permission denied - allow Location for this site in the browse
 function shrink(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=()=>rej();fr.onload=()=>{const im=new Image();im.onerror=()=>rej();im.onload=()=>{
   for(const[mx,qq]of[[800,.6],[640,.5],[480,.4]]){const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);const u=c.toDataURL('image/jpeg',qq);if(u.length<170000||mx===480)return res(u)}};im.src=fr.result};fr.readAsDataURL(file)})}
 function store(){try{localStorage.setItem('fe_v2',JSON.stringify(A))}catch(e){toast('Phone storage full - send your results now')}}
+const gkOf=s=>s.mobile+'_'+(s.at==='Office'?'O':'R');
+function groupsOf(p){const m={},o=[];p.stops.slice().sort((x,y)=>x.order-y.order).forEach(s=>{const k=gkOf(s);if(!m[k]){m[k]={k,mobile:s.mobile,name:s.name,at:s.at,pin:s.pin,ra:s.ra,oa:s.oa,lot:s.lot,rv:s.rv,ov:s.ov,last:s.last,order:s.order,accts:[]};o.push(m[k])}m[k].accts.push(s)});o.forEach((g,i)=>g.n=i+1);return o}
+const recOf=(p,g,s)=>(A.dispo||{})[did(p.date,g.mobile,g.at,s.acct)];
+function dA(k,i){const dr=drafts[k]||(drafts[k]={a:{}});if(!dr.a[i]){const g=groupsOf(A.plan).find(x=>x.k===k),s=g&&g.accts[i],r=s&&recOf(A.plan,g,s);dr.a[i]=r?{d:r.disposition,pd:r.ptpDate,amt:r.amount}:{}}return dr.a[i]}
+function migrate(){if(!A.plan||!A.dispo)return;const nd={};Object.values(A.dispo).forEach(r=>{if(r.acct===undefined){const s=A.plan.stops.find(x=>x.mobile===r.mobile&&x.at===r.visitAt);r.acct=s?s.acct:''}nd[did(r.date,r.mobile,r.visitAt,r.acct)]=r});A.dispo=nd}
 function feRender(force){
   const a=document.activeElement;if(!force&&a&&$('list').contains(a)&&/TEXTAREA|INPUT/.test(a.tagName)){pending=true;return}pending=false;
   $('loader').hidden=!!A.plan;$('app').hidden=!A.plan;if(!A.plan)return;
-  const p=A.plan,D=A.dispo||(A.dispo={});$('who').textContent=p.fe+' · '+(p.state?p.state+' · ':'')+p.date;
-  const st=p.stops.slice().sort((x,y)=>x.order-y.order);let done=0;
-  const pend=st.filter(s=>!D[did(p.date,s.mobile,s.at)]).slice(0,10);
+  const p=A.plan;A.dispo=A.dispo||{};$('who').textContent=p.fe+' · '+(p.state?p.state+' · ':'')+p.date;
+  const G=groupsOf(p);let done=0,accRec=0;
+  const isDone=g=>g.accts.every(s=>recOf(p,g,s));
+  const pend=G.filter(g=>!isDone(g)).slice(0,10);
   $('navall').innerHTML=pend.length?`<a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(pend[pend.length-1]))}${pend.length>1?'&waypoints='+pend.slice(0,-1).map(s=>encodeURIComponent(full(s))).join('%7C'):''}">🧭 Navigate all ${pend.length} pending stops (from my location)</a>`:'';
-  $('list').innerHTML=st.map(s=>{
-    const r=D[did(p.date,s.mobile,s.at)],isd=!!r&&!editing[s.mobile];if(r)done++;const m=esc(s.mobile);
-    const dr=drafts[s.mobile]||(r?{d:r.disposition,fb:r.feedback,pd:r.ptpDate,amt:r.amount}:{}),cls=(DISPO.find(x=>x[0]===(r&&r.disposition))||[0,'u'])[1];
-    let h=`<div class="card ${r?'done':''}"><div class="row jb"><h3>Top ${s.order}: ${esc(s.name)}</h3><span class="badge">Visit ${esc(s.at)}</span></div>
-    <div class="mu">${esc(s.acct)} · Lot ${esc(s.lot)} · Prior visits: Resi ${esc(s.rv||0)}, Office ${esc(s.ov||0)}${s.last?' · Last: '+esc(s.last):''}</div>
-    ${(s.pos!==''&&s.pos!=null)||(s.mad!==''&&s.mad!=null)?`<div class="amt"><span>POS <b>${fmt(s.pos)}</b></span><span>MAD <b>${fmt(s.mad)}</b></span><span>Physical target <b>${fmt(s.pt!==''&&s.pt!=null?s.pt:(s.pos?Math.round(s.pos*0.2):''))}</b></span></div><div class="mu">Account counts as paid once the MAD is collected. Aim for the physical target.</div>`:''}
-    <div class="addr ${s.at==='Residence'?'cur':''}"><b>🏠 Residence</b> ${s.at==='Residence'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.ra||'—')}</div>
-    <div class="addr ${s.at==='Office'?'cur':''}"><b>🏢 Office</b> ${s.at==='Office'?'(PIN '+esc(s.pin)+')':''}<br>${esc(s.oa||'—')}</div>
-    <div class="row" style="margin-top:8px"><a class="btn" href="tel:${m}">📞 ${m}</a><a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(s))}">🧭 Navigate</a></div>`;
-    if(isd)h+=`<div class="chips"><span class="chip ${cls} sel">${esc(r.disposition)}</span></div><div class="mu">${esc(r.ptpDate?'Date '+r.ptpDate+' ':'')}${esc(r.amount?'₹'+r.amount+' ':'')}${esc(r.feedback)}<br>${r.gpsOk?'📍 location ±'+esc(r.acc)+' m':'⚠ no GPS'} ${r.hasPhoto?'· 📷 photo':''}</div><button data-edit="${m}">Edit</button>`;
-    else{h+=`<div class="chips">${DISPO.map(([d,c])=>`<button class="chip ${c} ${dr.d===d?'sel':''}" data-d="${m}|${d}">${d}</button>`).join('')}</div>`;
-      if(dr.d==='PTP'||dr.d==='PAID')h+=`<div class="row"><input type="date" data-f="pd|${m}" value="${esc(dr.pd||'')}"><input type="number" inputmode="numeric" data-f="amt|${m}" placeholder="Amount collected ₹${s.mad?' (MAD '+fmt(s.mad)+')':''}" value="${esc(dr.amt||'')}"></div>`;
-      h+=`<textarea data-f="fb|${m}" placeholder="Remarks / feedback">${esc(dr.fb||'')}</textarea>
-      <div class="row" style="margin-top:6px"><button data-gps="${m}">📍 ${dr.gps?'Location ±'+dr.gps.acc+' m ✓':'Capture location'}</button><label class="row mu">📷 <input type="file" accept="image/*" capture="environment" data-ph="${m}"></label></div>
-      ${dr.photo?`<img class="th" src="${dr.photo}" alt="photo preview">`:''}<button class="pri" data-save="${m}" style="margin-top:8px;width:100%">Save visit</button>`}
+  $('list').innerHTML=G.map(g=>{
+    const recs=g.accts.map(s=>recOf(p,g,s)),all=recs.every(Boolean),isd=all&&!editing[g.k],k=g.k,dr=drafts[k]||{a:{}},m=esc(g.mobile),multi=g.accts.length>1;
+    if(all)done++;accRec+=recs.filter(Boolean).length;
+    let h=`<div class="card ${all?'done':''}"><div class="row jb"><h3>Stop ${g.n}: ${esc(g.name)}</h3><span class="badge">Visit ${esc(g.at)}${multi?' · '+g.accts.length+' accounts':''}</span></div>
+    <div class="mu">Lot ${esc(g.lot)} · Prior visits: Resi ${esc(g.rv||0)}, Office ${esc(g.ov||0)}${g.last?' · Last: '+esc(g.last):''}</div>
+    ${multi?'<div class="mu"><b>One visit covers all '+g.accts.length+' accounts below</b> - record each account separately.</div>':''}
+    <div class="addr ${g.at==='Residence'?'cur':''}"><b>🏠 Residence</b> ${g.at==='Residence'?'(PIN '+esc(g.pin)+')':''}<br>${esc(g.ra||'—')}</div>
+    <div class="addr ${g.at==='Office'?'cur':''}"><b>🏢 Office</b> ${g.at==='Office'?'(PIN '+esc(g.pin)+')':''}<br>${esc(g.oa||'—')}</div>
+    <div class="row" style="margin-top:8px"><a class="btn" href="tel:${m}">📞 ${m}</a><a class="btn" target="_blank" rel="noopener" href="${GM}&destination=${encodeURIComponent(full(g))}">🧭 Navigate</a></div>`;
+    g.accts.forEach((s,i)=>{const r=recs[i],da=(dr.a&&dr.a[i])||(r?{d:r.disposition,pd:r.ptpDate,amt:r.amount}:{}),cls=(DISPO.find(x=>x[0]===(r&&r.disposition))||[0,'u'])[1];
+      h+=`<div class="acct" style="border:1px solid var(--bd);border-radius:10px;padding:8px;margin-top:10px"><b>Account ${esc(s.acct)}</b>${multi?' <span class="mu">('+(i+1)+' of '+g.accts.length+')</span>':''}${r?' <span class="badge">recorded</span>':''}
+      ${(s.pos!==''&&s.pos!=null)||(s.mad!==''&&s.mad!=null)?`<div class="amt"><span>POS <b>${fmt(s.pos)}</b></span><span>MAD <b>${fmt(s.mad)}</b></span><span>Physical target <b>${fmt(s.pt!==''&&s.pt!=null?s.pt:(s.pos?Math.round(s.pos*0.2):''))}</b></span></div><div class="mu">Account counts as paid once the MAD is collected. Aim for the physical target.</div>`:''}`;
+      if(isd)h+=`<div class="chips"><span class="chip ${cls} sel">${esc(r.disposition)}</span></div><div class="mu">${esc(r.ptpDate?'Date '+r.ptpDate+' ':'')}${esc(r.amount?'₹'+r.amount+' ':'')}</div>`;
+      else{h+=`<div class="chips">${DISPO.map(([d,c])=>`<button class="chip ${c} ${da.d===d?'sel':''}" data-d="${k}|${i}|${d}">${d}</button>`).join('')}</div>`;
+        if(da.d==='PTP'||da.d==='PAID')h+=`<div class="row"><input type="date" data-f="pd|${k}|${i}" value="${esc(da.pd||'')}"><input type="number" inputmode="numeric" data-f="amt|${k}|${i}" placeholder="Amount collected ₹${s.mad?' (MAD '+fmt(s.mad)+')':''}" value="${esc(da.amt||'')}"></div>`;
+        if(multi&&i===0)h+=`<button data-all="${k}" class="mu">Use this disposition for all ${g.accts.length} accounts</button>`}
+      h+='</div>'});
+    const r0=recs[0],fb=dr.fb!==undefined?dr.fb:(r0?r0.feedback:'');
+    if(isd)h+=`<div class="mu" style="margin-top:6px">${esc(r0.feedback)}<br>${r0.gpsOk?'📍 location ±'+esc(r0.acc)+' m':'⚠ no GPS'} ${r0.hasPhoto?'· 📷 photo':''}</div><button data-edit="${k}">Edit</button>`;
+    else h+=`<textarea data-f="fb|${k}|" placeholder="Remarks / feedback (applies to the visit)" style="margin-top:8px">${esc(fb||'')}</textarea>
+      <div class="row" style="margin-top:6px"><button data-gps="${k}">📍 ${dr.gps?'Location ±'+dr.gps.acc+' m ✓':'Capture location'}</button><label class="row mu">📷 <input type="file" accept="image/*" capture="environment" data-ph="${k}"></label></div>
+      ${dr.photo?`<img class="th" src="${dr.photo}" alt="photo preview">`:''}<button class="pri" data-save="${k}" style="margin-top:8px;width:100%">Save visit${multi?' (all '+g.accts.length+' accounts)':''}</button>`;
     return h+'</div>'}).join('');
-  $('prog').style.width=(st.length?done/st.length*100:0)+'%';$('progt').textContent=done+' of '+st.length+' visits recorded';
+  $('prog').style.width=(G.length?done/G.length*100:0)+'%';$('progt').textContent=done+' of '+G.length+' stops recorded ('+accRec+' of '+p.stops.length+' accounts)';
 }
-async function feSave(m){
-  const p=A.plan,s=p.stops.find(x=>x.mobile===m),dr=drafts[m]||{};
-  if(!dr.d){toast('Select a disposition first');return}
-  if(dr.d==='PAID'&&!(parseFloat(dr.amt)>0)){alert('Enter the AMOUNT COLLECTED for a PAID visit - it is used for the FE ranking.');return}
-  if(dr.d==='PAID'&&s.mad&&parseFloat(dr.amt)<s.mad&&!confirm('Amount collected (₹'+dr.amt+') is BELOW the MAD ('+fmt(s.mad)+'). The account will stay UNPAID.\n\nSave anyway?'))return;
+async function feSave(k){
+  const p=A.plan,g=groupsOf(p).find(x=>x.k===k);if(!g)return;const dr=drafts[k]||(drafts[k]={a:{}});
+  const rows=g.accts.map((s,i)=>{const r=recOf(p,g,s),da=(dr.a&&dr.a[i])||(r?{d:r.disposition,pd:r.ptpDate,amt:r.amount}:{});return{s,i,da,r}});
+  if(rows.some(x=>!x.da.d)){toast(rows.length>1?'Select a disposition for every account':'Select a disposition first');return}
+  const noamt=rows.filter(x=>x.da.d==='PAID'&&!(parseFloat(x.da.amt)>0));
+  if(noamt.length){alert('Enter the AMOUNT COLLECTED for each PAID account ('+noamt.map(x=>x.s.acct).join(', ')+') - it is used for the FE ranking.');return}
+  const low=rows.filter(x=>x.da.d==='PAID'&&x.s.mad&&parseFloat(x.da.amt)<x.s.mad);
+  if(low.length&&!confirm(low.map(x=>'Account '+x.s.acct+': collected ₹'+x.da.amt+' is BELOW the MAD ('+fmt(x.s.mad)+')').join('\n')+'\n\nThe account(s) will stay UNPAID.\n\nSave anyway?'))return;
   if(!gok(dr.gps)){toast('Getting location…');dr.gps=await getGPS()}
-  const id=did(p.date,m,s.at),prev=A.dispo[id];let g=gok(dr.gps)?dr.gps:null;
-  if(!g&&!confirm('LOCATION NOT CAPTURED: '+why(dr.gps)+'.\n\nSave this visit WITHOUT location?')){dr.gps=null;feRender(true);return}
-  if(!dr.photo&&!(prev&&prev.hasPhoto)&&!confirm('No photo attached. Save this visit WITHOUT a photo?'))return;
-  A.dispo[id]={date:p.date,mobile:m,fe:p.fe,name:s.name,visitAt:s.at,address:tgt(s),pin:s.pin,disposition:dr.d,feedback:dr.fb||'',ptpDate:dr.pd||'',amount:dr.amt||'',order:s.order,ts:Date.now(),lat:g?g.lat:null,lng:g?g.lng:null,acc:g?g.acc:null,gpsOk:!!g,hasPhoto:!!dr.photo||!!(prev&&prev.hasPhoto)};
-  if(dr.photo){(A.photos=A.photos||{})[id]=dr.photo}
-  store();delete drafts[m];delete editing[m];toast(g?'Saved with location':'Saved (no GPS - allow location access)');feRender(true);
+  const gg=gok(dr.gps)?dr.gps:null;
+  if(!gg&&!confirm('LOCATION NOT CAPTURED: '+why(dr.gps)+'.\n\nSave this visit WITHOUT location?')){dr.gps=null;feRender(true);return}
+  const prevPhoto=rows.some(x=>x.r&&x.r.hasPhoto);
+  if(!dr.photo&&!prevPhoto&&!confirm('No photo attached. Save this visit WITHOUT a photo?'))return;
+  const fb=dr.fb!==undefined?dr.fb:(rows[0].r?rows[0].r.feedback:''),ts=Date.now();
+  rows.forEach(x=>{A.dispo[did(p.date,g.mobile,g.at,x.s.acct)]={date:p.date,mobile:g.mobile,acct:x.s.acct,fe:p.fe,name:g.name,visitAt:g.at,address:tgt(g),pin:g.pin,disposition:x.da.d,feedback:fb||'',ptpDate:x.da.pd||'',amount:x.da.amt||'',order:g.order,ts,lat:gg?gg.lat:null,lng:gg?gg.lng:null,acc:gg?gg.acc:null,gpsOk:!!gg,hasPhoto:!!dr.photo||prevPhoto}});
+  if(dr.photo){(A.photos=A.photos||{})[pid(p.date,g.mobile,g.at)]=dr.photo}
+  store();delete drafts[k];delete editing[k];toast(gg?'Saved with location':'Saved (no GPS - allow location access)');feRender(true);
 }
 function setPlan(plan){A={plan,dispo:{},photos:{}};store();feRender(true)}
 function chooseFE(by,date){const names=Object.keys(by);if(!names.length){toast('No stops found - check the header row');return}
@@ -142,18 +161,19 @@ function loadText(t){t=t.trim();
   if(t[0]==='{'){try{const o=JSON.parse(t);if(o.fe&&o.stops)return setPlan({fe:o.fe,date:o.date,stops:o.stops,state:o.state||''})}catch(e){}toast('Not a valid plan file');return}
   const by=parse(t);if(!by){toast('Header row (Field Executive … Mobile No) not found');return}chooseFE(by,$('pdt').value||today())}
 if(MODE==='fe'){
-  try{A=JSON.parse(localStorage.getItem('fe_v2'))||{}}catch(e){A={}}
+  try{A=JSON.parse(localStorage.getItem('fe_v2'))||{}}catch(e){A={}}migrate();
   $('pdt').value=today();
   $('pf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>loadText(String(r.result));r.readAsText(f)};
   $('pl').onclick=()=>loadText($('pt').value);
   $('clr').onclick=()=>{if(confirm('Remove this plan and its saved visits from this phone? Send your results first.')){A={};try{localStorage.removeItem('fe_v2')}catch(e){}feRender(true)}};
   document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
-    if(d.d){const[m,v]=d.d.split('|');drafts[m]=Object.assign(drafts[m]||{},{d:v});feRender(true)}
+    if(d.d){const[k,i,v]=d.d.split('|');dA(k,i).d=v;feRender(true)}
+    else if(d.all){const k=d.all,g=groupsOf(A.plan).find(x=>x.k===k),a0=dA(k,0);g.accts.forEach((s,i)=>{if(i){const x=dA(k,i);x.d=a0.d;if(a0.pd)x.pd=a0.pd}});feRender(true)}
     else if(d.edit){editing[d.edit]=1;feRender(true)}
     else if(d.save)feSave(d.save);
-    else if(d.gps){t.textContent='Locating…';const g=await getGPS();drafts[d.gps]=Object.assign(drafts[d.gps]||{},{gps:gok(g)?g:null});if(!gok(g))alert('Location not captured: '+why(g));feRender(true)}});
-  document.addEventListener('input',e=>{const f=e.target.dataset&&e.target.dataset.f;if(!f)return;const[k,m]=f.split('|');drafts[m]=drafts[m]||{};drafts[m][k]=e.target.value});
-  document.addEventListener('change',async e=>{const m=e.target.dataset&&e.target.dataset.ph;if(!m||!e.target.files[0])return;try{drafts[m]=Object.assign(drafts[m]||{},{photo:await shrink(e.target.files[0])});feRender(true)}catch(x){toast('Could not read photo')}});
+    else if(d.gps){t.textContent='Locating…';const g=await getGPS();const dr=drafts[d.gps]||(drafts[d.gps]={a:{}});dr.gps=gok(g)?g:null;if(!gok(g))alert('Location not captured: '+why(g));feRender(true)}});
+  document.addEventListener('input',e=>{const f=e.target.dataset&&e.target.dataset.f;if(!f)return;const[kk,k,i]=f.split('|');if(kk==='fb'){(drafts[k]=drafts[k]||{a:{}}).fb=e.target.value}else dA(k,i)[kk]=e.target.value});
+  document.addEventListener('change',async e=>{const k=e.target.dataset&&e.target.dataset.ph;if(!k||!e.target.files[0])return;try{(drafts[k]=drafts[k]||{a:{}}).photo=await shrink(e.target.files[0]);feRender(true)}catch(x){toast('Could not read photo')}});
   document.addEventListener('focusout',()=>setTimeout(()=>{if(pending)feRender()},50));
   $('send').onclick=async()=>{const ids=Object.keys(A.dispo||{});if(!ids.length){toast('No visits recorded yet');return}
     const pay={v:2,fe:A.plan.fe,state:A.plan.state||'',date:A.plan.date,sent:Date.now(),records:Object.values(A.dispo),photos:A.photos||{}},name='Visits_'+slug(pay.fe)+'_'+pay.date+'.json';
@@ -180,20 +200,20 @@ if(MODE==='sup'){
   $('pz').onclick=async()=>{if(!Object.keys(PL).length){toast('Build plan files first');return}if(!window.JSZip){toast('Zip library not loaded - use the individual buttons');return}
     const z=new JSZip();Object.keys(PL).forEach(f=>{const o=planFile(f);z.file(o.name,o.text)});dl('FE_Plans_'+$('sdt').value+'.zip',await z.generateAsync({type:'blob'}))};
   $('rf').onchange=async e=>{let n=0,v=0;
-    for(const f of e.target.files){try{const o=JSON.parse(await f.text());if((o.state||'')!==STATE){toast(f.name+': not a '+STATE+' file - ignored');continue}(o.records||[]).forEach(r=>{const id=did(r.date,r.mobile,r.visitAt);if(!R[id]||r.ts>=R[id].ts){R[id]=r;if(o.photos&&o.photos[id])P[id]=o.photos[id];v++}});n++}catch(x){toast('Could not read '+f.name)}}
+    for(const f of e.target.files){try{const o=JSON.parse(await f.text());if((o.state||'')!==STATE){toast(f.name+': not a '+STATE+' file - ignored');continue}(o.records||[]).forEach(r=>{const id=did(r.date,r.mobile,r.visitAt,r.acct),pk=pid(r.date,r.mobile,r.visitAt);if(!R[id]||r.ts>=R[id].ts){R[id]=r;if(o.photos&&o.photos[pk])P[pk]=o.photos[pk];v++}});n++}catch(x){toast('Could not read '+f.name)}}
     $('rmsg').textContent=n+' file(s) read, '+Object.keys(R).length+' visit(s) in total.';supv()};
   const recs=()=>Object.values(R).sort((a,b)=>a.ts-b.ts);
   function supv(){const X=recs(),fes=[...new Set(X.map(r=>r.fe).concat(Object.keys(PL)))].sort();
     $('sum').innerHTML='<tr><th>Field Executive</th><th>Planned</th><th>Recorded</th><th>GPS ok</th><th>Photos</th></tr>'+fes.map(f=>{const x=X.filter(r=>r.fe===f);return `<tr><td>${esc(f)}</td><td>${PL[f]?PL[f].length:'-'}</td><td>${x.length}</td><td>${x.filter(r=>r.gpsOk).length}</td><td>${x.filter(r=>r.hasPhoto).length}</td></tr>`}).join('');
-    $('tbl').innerHTML='<tr><th>Time</th><th>FE</th><th>Customer</th><th>At</th><th>Disp.</th><th>Remarks</th><th>GPS</th><th>Photo</th></tr>'+X.map(r=>{const id=did(r.date,r.mobile,r.visitAt);return `<tr><td>${esc(new Date(r.ts).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td>${esc(r.fe)}</td><td>${esc(r.name)}<br>${esc(r.mobile)}</td><td>${esc(r.visitAt)}</td><td>${esc(r.disposition)}</td><td>${esc(r.feedback)}</td><td>${r.gpsOk?`<a target="_blank" rel="noopener" href="${gl(r)}">±${esc(r.acc)}m</a>`:'<span style="color:var(--bad)">no GPS</span>'}</td><td>${P[id]?`<button data-ph="${esc(id)}">View</button>`:'<span style="color:var(--bad)">'+(r.hasPhoto?'photo missing in file':'no photo')+'</span>'}</td></tr>`}).join('')}
+    $('tbl').innerHTML='<tr><th>Time</th><th>FE</th><th>Customer / Account</th><th>At</th><th>Disp.</th><th>Remarks</th><th>GPS</th><th>Photo</th></tr>'+X.map(r=>{const id=pid(r.date,r.mobile,r.visitAt);return `<tr><td>${esc(new Date(r.ts).toLocaleString([], {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</td><td>${esc(r.fe)}</td><td>${esc(r.name)}<br>${esc(r.mobile)}<br>${esc(r.acct||'')}</td><td>${esc(r.visitAt)}</td><td>${esc(r.disposition)}</td><td>${esc(r.feedback)}</td><td>${r.gpsOk?`<a target="_blank" rel="noopener" href="${gl(r)}">±${esc(r.acc)}m</a>`:'<span style="color:var(--bad)">no GPS</span>'}</td><td>${P[id]?`<button data-ph="${esc(id)}">View</button>`:'<span style="color:var(--bad)">'+(r.hasPhoto?'photo missing in file':'no photo')+'</span>'}</td></tr>`}).join('')}
   $('tbl').onclick=e=>{const id=e.target.dataset&&e.target.dataset.ph;if(id&&P[id])photoView(P[id])};
-  const rowsOf=X=>X.map(r=>[r.date,new Date(r.ts).toLocaleTimeString(),r.fe,r.name,r.mobile,r.visitAt,r.address,r.pin,r.disposition,r.ptpDate,r.amount,r.feedback,r.lat,r.lng,r.acc,gl(r),P[did(r.date,r.mobile,r.visitAt)]?fname(r):'']);
+  const rowsOf=X=>X.map(r=>[r.date,new Date(r.ts).toLocaleTimeString(),r.fe,r.name,r.mobile,r.visitAt,r.address,r.pin,r.disposition,r.ptpDate,r.amount,r.feedback,r.lat,r.lng,r.acc,gl(r),P[pid(r.date,r.mobile,r.visitAt)]?fname(r):'',r.acct||'']);
   $('csv').onclick=()=>{const X=recs();if(!X.length){toast('Load result files first');return}
-    const hd=['Visit Date','Time','Field Executive','Customer','Mobile No','Visited At','Visit Address','PIN','Disposition','PTP/Paid Date','Amount','Remarks','Latitude','Longitude','GPS Accuracy (m)','GPS Map Link','Photo File'];
+    const hd=['Visit Date','Time','Field Executive','Customer','Mobile No','Visited At','Visit Address','PIN','Disposition','PTP/Paid Date','Amount','Remarks','Latitude','Longitude','GPS Accuracy (m)','GPS Map Link','Photo File','Account / Loan No'];
     dl('Dispositions_'+X[0].date+(X.some(r=>r.date!==X[0].date)?'_multi':'')+'.csv','\ufeff'+hd.map(q).join(',')+'\n'+rowsOf(X).map(a=>a.map(q).join(',')).join('\n'),'text/csv')};
   $('mk').onclick=()=>{const X=recs();$('out').value=rowsOf(X).map(a=>a.map(v=>String(v==null?'':v).replace(/[\t\r\n]/g,' ')).join('\t')).join('\n');$('out').select();toast(X.length+' row(s)')};
-  $('zip').onclick=async()=>{const X=recs().filter(r=>P[did(r.date,r.mobile,r.visitAt)]);if(!X.length){toast('No photos loaded');return}if(!window.JSZip){toast('Zip library not loaded (needs internet)');return}
-    const z=new JSZip();X.forEach(r=>z.file(fname(r),P[did(r.date,r.mobile,r.visitAt)].split(',')[1],{base64:true}));dl('Photos_'+X[0].date+'.zip',await z.generateAsync({type:'blob'}))};
+  $('zip').onclick=async()=>{const X=recs().filter(r=>P[pid(r.date,r.mobile,r.visitAt)]);if(!X.length){toast('No photos loaded');return}if(!window.JSZip){toast('Zip library not loaded (needs internet)');return}
+    const z=new JSZip();X.forEach(r=>z.file(fname(r),P[pid(r.date,r.mobile,r.visitAt)].split(',')[1],{base64:true}));dl('Photos_'+X[0].date+'.zip',await z.generateAsync({type:'blob'}))};
   supv();
 }
 </script></body></html>
