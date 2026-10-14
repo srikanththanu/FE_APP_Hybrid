@@ -21,9 +21,20 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 img.th{max-width:100%;max-height:120px;border-radius:6px;margin-top:6px}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px}.ov[hidden]{display:none}.ov img{max-width:100%;max-height:80%}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--ac);color:var(--acx);padding:8px 14px;border-radius:20px;display:none;z-index:9}
+
+.tabs{display:flex;gap:6px;margin:0 0 10px}.tabs button{flex:1;padding:10px;font-weight:bold}.tabs button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+#tabC .it{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:6px 0;cursor:pointer;user-select:none}
+#tabC .it.on{border-color:var(--ok);background:var(--okb)}
+#tabC .bx{flex:0 0 28px;height:28px;border:2px solid var(--mu);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff}
+#tabC .it.on .bx{background:var(--ok);border-color:var(--ok)}
+#tabC .a{font-weight:600}#tabC .b{color:var(--mu);font-size:13.5px;margin-top:2px}
+#tabC .ksec{margin:16px 0 6px;color:var(--neu);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1px}
+#tabC .f{flex:1 1 140px}#tabC label.l{font-size:12px;color:var(--mu);display:block;margin-bottom:3px}#tabC input,#tabC select{width:100%}
+#tabC .lg button.on{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:bold}
 </style></head><body data-mode="fe">
 <h1>FE Visit App</h1>
-
+<div class="tabs" id="tabs"><button class="on" data-t="v">Visits</button><button data-t="c">Daily checklist</button></div>
+<div id="tabV">
 <div class="feOnly">
  <div id="loader" class="card"><b>Load today's plan</b>
   <p class="mu">Open the plan file your supervisor sent (.json), or paste the plan text from WhatsApp (the message starting FEPLAN:) into the box below, then tap Load.</p>
@@ -38,6 +49,22 @@ img.th{max-width:100%;max-height:120px;border-radius:6px;margin-top:6px}
  </div>
 </div>
 
+</div>
+<div id="tabC" hidden>
+ <div class="row lg" id="klg"><button data-l="en" class="on" style="flex:1">English</button><button data-l="ta" style="flex:1">தமிழ்</button></div>
+ <h2 id="kt1" style="font-size:17px;margin:10px 0 2px">Daily checklist</h2><div class="mu" id="kt2"></div>
+ <div class="row"><div class="f"><label class="l" id="klb1">Name</label><input id="knm"></div><div class="f"><label class="l" id="klb2">State</label>
+ <select id="kst"><option>Tamil Nadu</option><option>Karnataka</option><option>Telangana</option><option>Andhra Pradesh</option></select></div>
+ <div class="f"><label class="l" id="klb3">Date</label><input type="date" id="kdt"></div></div>
+ <div class="row"><div class="f"><label class="l" id="klb4">Supervisor WhatsApp number (10 digits)</label><input id="ksp" inputmode="numeric" maxlength="10"></div>
+ <div class="f"><label class="l" id="klb5">Stops planned</label><input id="knp" type="number" inputmode="numeric" min="0"></div>
+ <div class="f"><label class="l" id="klb6">Stops recorded</label><input id="knd" type="number" inputmode="numeric" min="0"></div></div>
+ <button id="kfill" style="width:100%"></button>
+ <div class="bar"><i id="kpb" style="width:0"></i></div><div class="mu" id="kpc"></div>
+ <div id="klist"></div>
+ <div class="ksec" id="klb7">Remarks / problems (optional)</div><textarea id="krm" rows="3"></textarea>
+ <div class="row" style="margin-top:10px"><button id="krs">Reset day</button><button class="pri" id="ksd" style="flex:1"></button></div><p class="mu" id="kms"></p>
+</div>
 <div class="supOnly">
  <div class="card"><b>1. Build plan files for executives</b>
   <p class="mu">Paste the exported plan rows for your state (All_FE_Plan or per-FE file, header row included - needs the State column; include POS Allocated, MAD and Physical Target so the FE sees them). Only <b></b> executives are accepted. Send each executive their own plan.</p>
@@ -216,4 +243,50 @@ if(MODE==='sup'){
     const z=new JSZip();X.forEach(r=>z.file(fname(r),P[pid(r.date,r.mobile,r.visitAt)].split(',')[1],{base64:true}));dl('Photos_'+X[0].date+'.zip',await z.generateAsync({type:'blob'}))};
   supv();
 }
+</script><script>
+(()=>{
+const D={"en": [["START OF DAY", [["Plan received from supervisor on WhatsApp", "File or plan text starting FEPLAN"], ["Open the app link in Chrome, allow Location", "Use the https link, not a downloaded file"], ["Load plan: check my name and number of stops", "About 5 to 6 hours of work, residence first; two accounts of one customer = one card"], ["Phone charged, mobile data on", "Camera and location allowed"]]], ["AT EVERY STOP  (tick when done for all stops of the day)", [["Tap Navigate and reach the address on the card", "Check POS, MAD and physical target"], ["Choose disposition and add a short remark", ""], ["Capture GPS at the door", "Wait for accuracy, then save"], ["Take the photo", "Premises or receipt, clear and well lit"], ["PAID: enter the amount actually collected", "Below MAD stays unpaid. PTP: enter promise date"], ["Save the visit", "Progress is saved on the phone"]]], ["END OF DAY", [["Every stop on my plan is recorded", ""], ["Send results to supervisor on WhatsApp", "If sharing fails, attach the downloaded Visits_ file"], ["Supervisor confirmed receipt", "Do not clear Chrome data before this"]]]], "ta": [["நாள் தொடக்கம்", [["மேற்பார்வையாளரிடமிருந்து WhatsApp இல் திட்டம் பெற்றேன்", "கோப்பு அல்லது FEPLAN எனத் தொடங்கும் உரை"], ["Chrome இல் செயலி இணைப்பைத் திறந்து Location அனுமதித்தேன்", "https இணைப்பைப் பயன்படுத்தவும், பதிவிறக்கிய கோப்பை அல்ல"], ["Load plan: என் பெயர், இடங்களின் எண்ணிக்கை சரிபார்த்தேன்", "சுமார் ஐந்து முதல் ஆறு மணி நேர வேலை, முதலில் வீட்டு முகவரி. ஒரே வாடிக்கையாளரின் இரண்டு கணக்குகள் ஒரே அட்டையில்"], ["கைபேசியில் சார்ஜ், மொபைல் டேட்டா உள்ளது", "Camera மற்றும் Location அனுமதி உள்ளது"]]], ["ஒவ்வொரு இடத்திலும்  (அன்றைய எல்லா இடங்களும் முடிந்ததும் டிக் செய்யவும்)", [["Navigate அழுத்தி அட்டையில் உள்ள முகவரிக்குச் சென்றேன்", "POS, MAD, Physical target பார்க்கவும்"], ["Disposition தேர்ந்தெடுத்து சிறு குறிப்பு எழுதினேன்", ""], ["வாசலில் GPS பதிவு செய்தேன்", "துல்லியம் வரும் வரை காத்திருந்து சேமிக்கவும்"], ["புகைப்படம் எடுத்தேன்", "வீடு அல்லது ரசீது, தெளிவாக"], ["PAID: உண்மையில் பெற்ற தொகையை உள்ளிட்டேன்", "MAD க்குக் குறைவு என்றால் unpaid. PTP: உறுதி தேதி உள்ளிடவும்"], ["Save visit அழுத்தினேன்", "முன்னேற்றம் கைபேசியில் சேமிக்கப்படும்"]]], ["நாள் முடிவு", [["என் திட்டத்தில் உள்ள எல்லா இடங்களும் பதிவாகிவிட்டன", ""], ["முடிவுகளை WhatsApp இல் மேற்பார்வையாளருக்கு அனுப்பினேன்", "பகிர முடியவில்லை என்றால் பதிவிறங்கிய Visits_ கோப்பை இணைக்கவும்"], ["மேற்பார்வையாளர் பெற்றதை உறுதி செய்தார்", "இதற்கு முன் Chrome தரவை அழிக்காதீர்கள்"]]]]};
+const T={en:{t1:'Daily checklist',t2:'Tick each step through the day, then send to your supervisor.',lb1:'Name',lb2:'State',lb3:'Date',lb4:'Supervisor WhatsApp number (10 digits)',lb5:'Stops planned',lb6:'Stops recorded',lb7:'Remarks / problems (optional)',send:'Send checklist to supervisor',reset:'Reset day',fill:'Fill stops from today\'s plan',done:'done',hdr:'FE DAILY CHECKLIST',nm:'FE',stops:'Stops recorded',nd:'Not done',all:'All steps done',rem:'Remarks',conf:'Reset all ticks for this day?',copied:'Message copied. Paste it in WhatsApp.',need:'Enter your name first'},
+ta:{t1:'தினசரி சரிபார்ப்புப் பட்டியல்',t2:'நாள் முழுவதும் ஒவ்வொரு படியையும் டிக் செய்து, மேற்பார்வையாளருக்கு அனுப்புங்கள்.',lb1:'பெயர்',lb2:'மாநிலம்',lb3:'தேதி',lb4:'மேற்பார்வையாளர் WhatsApp எண் (10 இலக்கம்)',lb5:'திட்டமிட்ட இடங்கள்',lb6:'பதிவான இடங்கள்',lb7:'குறிப்புகள் / சிக்கல்கள் (விருப்பம்)',send:'பட்டியலை மேற்பார்வையாளருக்கு அனுப்பு',reset:'நாளை மீட்டமை',fill:'இன்றைய திட்டத்திலிருந்து இடங்களை நிரப்பு',done:'முடிந்தது',hdr:'FE DAILY CHECKLIST',nm:'FE',stops:'Stops recorded',nd:'Not done',all:'All steps done',rem:'Remarks',conf:'இந்த நாளின் எல்லா டிக்குகளையும் அழிக்கவா?',copied:'செய்தி நகலெடுக்கப்பட்டது. WhatsApp இல் ஒட்டவும்.',need:'முதலில் பெயரை உள்ளிடுங்கள்'}};
+const K='fe_chk_v1';let S={};try{S=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
+S.p=S.p||{};S.days=S.days||{};S.lang=S.lang||'en';
+const g=i=>document.getElementById(i);const sv=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+g('kdt').value=S.date||today();
+const day=()=>S.days[g('kdt').value]=S.days[g('kdt').value]||{c:{},np:'',nd:'',rm:''};
+const counted=()=>{const o=[];D.en.forEach((s,si)=>s[1].forEach((it,ii)=>{if(!(si===D.en.length-1&&ii>=s[1].length-2))o.push([si,ii,it])}));return o};
+function prefill(){try{if(A&&A.plan){if(!S.p.nm)S.p.nm=A.plan.fe||'';if(!S.p.st&&A.plan.state)S.p.st=A.plan.state}}catch(e){}}
+function render(){prefill();const L=S.lang,t=T[L],d=day();
+ for(const k of ['t1','t2'])g('k'+k).textContent=t[k]||'';
+ for(let i=1;i<=7;i++)g('klb'+i).textContent=t['lb'+i];
+ g('ksd').textContent=t.send;g('krs').textContent=t.reset;g('kfill').textContent=t.fill;
+ document.querySelectorAll('#klg button').forEach(b=>b.classList.toggle('on',b.dataset.l===L));
+ g('knm').value=S.p.nm||'';g('kst').value=S.p.st||'Tamil Nadu';g('ksp').value=S.p.sp||'';g('knp').value=d.np;g('knd').value=d.nd;g('krm').value=d.rm;
+ let h='';D[L].forEach((s,si)=>{h+='<div class="ksec">'+s[0]+'</div>';s[1].forEach((it,ii)=>{const on=d.c[si+'_'+ii];h+=`<div class="it${on?' on':''}" data-k="${si}_${ii}"><div class="bx">${on?'✓':''}</div><div><div class="a">${it[0]}</div>${it[1]?'<div class="b">'+it[1]+'</div>':''}</div></div>`})});
+ g('klist').innerHTML=h;prog()}
+function prog(){const d=day(),c=counted(),n=c.filter(x=>d.c[x[0]+'_'+x[1]]).length;g('kpb').style.width=(100*n/c.length)+'%';g('kpc').textContent=n+' / '+c.length+' '+T[S.lang].done}
+g('klist').addEventListener('click',e=>{const it=e.target.closest('.it');if(!it)return;const d=day(),k=it.dataset.k;d.c[k]=!d.c[k];sv();it.classList.toggle('on',!!d.c[k]);it.querySelector('.bx').textContent=d.c[k]?'✓':'';prog()});
+g('klg').addEventListener('click',e=>{const l=e.target.dataset.l;if(l){S.lang=l;sv();render()}});
+g('kdt').addEventListener('change',()=>{S.date=g('kdt').value;sv();render()});
+for(const[i,k]of[['knm','nm'],['kst','st'],['ksp','sp']])g(i).addEventListener('input',()=>{S.p[k]=g(i).value;sv()});
+g('knp').addEventListener('input',()=>{day().np=g('knp').value;sv()});g('knd').addEventListener('input',()=>{day().nd=g('knd').value;sv()});
+g('krm').addEventListener('input',()=>{day().rm=g('krm').value;sv()});
+g('krs').onclick=()=>{if(confirm(T[S.lang].conf)){S.days[g('kdt').value]={c:{},np:'',nd:'',rm:''};sv();render()}};
+g('kfill').onclick=()=>{try{const dt=g('kdt').value,st=(A.plan&&A.plan.stops)||[];const pl=new Set(st.map(s=>s.mobile+'|'+s.at));
+ const rec=new Set(Object.keys(A.dispo||{}).filter(k=>k.startsWith(dt+'_')).map(k=>{const p=k.split('_');return p[1]+'|'+(p[2]||'')}));
+ const lc=new Set([...pl].map(x=>x.toLowerCase()));let n=0;rec.forEach(x=>{if(lc.has(x.toLowerCase()))n++});
+ day().np=String(pl.size);day().nd=String(n);sv();render()}catch(e){}};
+function msg(){const t=T.en,d=day(),c=counted(),nd=c.filter(x=>!d.c[x[0]+'_'+x[1]]).map(x=>'- '+x[2][0]);const n=c.length-nd.length;
+ let m=`${t.hdr}\n${t.nm}: ${g('knm').value||'-'} | ${g('kst').value} | ${g('kdt').value}\nSteps: ${n}/${c.length}\n${t.stops}: ${d.nd||'-'} of ${d.np||'-'} planned\n`;
+ m+=nd.length?`${t.nd}:\n${nd.join('\n')}\n`:`${t.all}\n`;if(d.rm.trim())m+=`${t.rem}: ${d.rm.trim().replace(/\s*\n\s*/g,' ')}\n`;return m.trim()}
+g('ksd').onclick=async()=>{
+ if(!g('knm').value.trim()){g('kms').textContent=T[S.lang].need;g('knm').focus();return}
+ S.p.nm=g('knm').value;sv();const m=msg(),sp=(g('ksp').value||'').replace(/\D/g,'');
+ if(sp.length===10){location.href='https://wa.me/91'+sp+'?text='+encodeURIComponent(m);return}
+ if(navigator.share){try{await navigator.share({text:m});return}catch(e){}}
+ try{await navigator.clipboard.writeText(m);g('kms').textContent=T[S.lang].copied}catch(e){g('kms').textContent=m}};
+const tv=document.getElementById('tabV'),tc=document.getElementById('tabC');
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const c=b.dataset.t==='c';tv.hidden=c;tc.hidden=!c;
+ document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));if(c)render()});
+render();
+})();
 </script></body></html>
